@@ -1,11 +1,17 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 from datetime import datetime
 import logging
+import os
+from dotenv import load_dotenv
 
 from compiler import compile_latex_to_pdf, LaTeXCompilationError
+from auth import get_current_user, get_optional_user, require_verified_email, AuthMiddleware
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +25,11 @@ class LaTeXCompileResponse(BaseModel):
     success: bool
     message: str
     pdf_size: int = 0
+
+class UserInfo(BaseModel):
+    id: str
+    email: str
+    role: str = "authenticated"
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,6 +46,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add authentication middleware
+app.add_middleware(AuthMiddleware)
 
 @app.get("/")
 async def health_check():
@@ -55,12 +69,42 @@ async def health():
     """
     return {"status": "ok"}
 
-@app.post("/compile", response_model=LaTeXCompileResponse)
-async def compile_latex(request: LaTeXCompileRequest):
+@app.get("/auth/me", response_model=UserInfo)
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """
-    Compile LaTeX content to PDF and return success status
+    Get current authenticated user information
+    """
+    return UserInfo(
+        id=current_user["id"],
+        email=current_user["email"],
+        role=current_user.get("role", "authenticated")
+    )
+
+@app.get("/auth/status")
+async def auth_status(request: Request):
+    """
+    Check authentication status (optional auth)
+    """
+    user = get_optional_user(request)
+    return {
+        "authenticated": user is not None,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user.get("role", "authenticated")
+        } if user else None
+    }
+
+@app.post("/compile", response_model=LaTeXCompileResponse)
+async def compile_latex(
+    request: LaTeXCompileRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Compile LaTeX content to PDF and return success status (requires authentication)
     """
     try:
+        logger.info(f"User {current_user['email']} (ID: {current_user['id']}) compiling LaTeX")
         pdf_bytes = compile_latex_to_pdf(request.latex_content)
         return LaTeXCompileResponse(
             success=True,
@@ -68,18 +112,22 @@ async def compile_latex(request: LaTeXCompileRequest):
             pdf_size=len(pdf_bytes)
         )
     except LaTeXCompilationError as e:
-        logger.error(f"LaTeX compilation failed: {str(e)}")
+        logger.error(f"LaTeX compilation failed for user {current_user['email']}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error during compilation: {str(e)}")
+        logger.error(f"Unexpected error during compilation for user {current_user['email']}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during compilation")
 
 @app.post("/compile/pdf")
-async def compile_latex_to_pdf_endpoint(request: LaTeXCompileRequest):
+async def compile_latex_to_pdf_endpoint(
+    request: LaTeXCompileRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Compile LaTeX content to PDF and return the PDF file directly
+    Compile LaTeX content to PDF and return the PDF file directly (requires authentication)
     """
     try:
+        logger.info(f"User {current_user['email']} (ID: {current_user['id']}) compiling LaTeX to PDF")
         pdf_bytes = compile_latex_to_pdf(request.latex_content)
         
         return Response(
@@ -91,10 +139,10 @@ async def compile_latex_to_pdf_endpoint(request: LaTeXCompileRequest):
             }
         )
     except LaTeXCompilationError as e:
-        logger.error(f"LaTeX compilation failed: {str(e)}")
+        logger.error(f"LaTeX compilation failed for user {current_user['email']}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error during compilation: {str(e)}")
+        logger.error(f"Unexpected error during compilation for user {current_user['email']}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during compilation")
 
 @app.get("/compiler/status")
