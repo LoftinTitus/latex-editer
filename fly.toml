@@ -1,0 +1,43 @@
+app = "latex-editor-api"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  PORT = "8000"
+  PYTHONPATH = "/app"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "10s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    timeout = "2s"
+    tls_skip_verify = false
+
+[vm]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+
+[[vm.mounts]]
+  source = "latex_cache"
+  destination = "/app/latex_cache"
+
+[deploy]
+  release_command = "python setup_database.py"
+  strategy = "immediate"
+
+[[statics]]
+  guest_path = "/app/static"
+  url_prefix = "/static/"
