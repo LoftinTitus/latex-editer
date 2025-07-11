@@ -11,12 +11,26 @@ The tech stack includes Alpine.js for the frontend, FastAPI (Python) for the bac
 ## Features
 
 - Text editor with LaTeX syntax input using `<textarea>` enhanced with Alpine.js for reactive UI
+- **LaTeX Autocomplete**: Smart autocomplete for LaTeX commands triggered by backslash (`\`) with dropdown suggestions
 - Server-side LaTeX compilation to PDF using Tectonic
 - Inline PDF preview within the browser using an iframe
 - User registration and login with email/password via Supabase authentication
 - Save, load, update, and delete notes stored in Supabase Postgres database
 - Download compiled PDF documents
 - Subscription-based payment integration for premium features
+
+### LaTeX Autocomplete Features
+
+- **Trigger**: Type `\` followed by letters to show autocomplete suggestions
+- **Navigation**: Use arrow keys (↑/↓) to navigate suggestions
+- **Selection**: Press Tab, Enter, or click to insert the selected command
+- **Smart Positioning**: Automatically positions cursor inside braces for commands like `\frac{}{}`
+- **Comprehensive Command Library**: Includes 100+ common LaTeX commands including:
+  - Document structure (`\documentclass`, `\begin{document}`, etc.)
+  - Sections (`\section{}`, `\subsection{}`, etc.)
+  - Math environments and symbols (`\frac{}{}`, `\sum`, `\alpha`, etc.)
+  - Text formatting (`\textbf{}`, `\emph{}`, etc.)
+  - Common packages (`\usepackage{amsmath}`, etc.)
 
 ---
 
@@ -25,6 +39,7 @@ The tech stack includes Alpine.js for the frontend, FastAPI (Python) for the bac
 | Component      | Technology            | Purpose                              | Notes                     |
 |----------------|-----------------------|------------------------------------|---------------------------|
 | Frontend       | HTML + Alpine.js      | Reactive UI without heavy frameworks | Fully static, free hosting |
+| Autocomplete   | Alpine.js + Custom JS | LaTeX command suggestions           | Lightweight, no external libraries |
 | Backend        | Python + FastAPI      | API endpoints and LaTeX compilation | Host on Fly.io free tier   |
 | LaTeX Compiler | Tectonic or pdflatex  | Compile `.tex` to `.pdf`             | Run in sandboxed subprocess|
 | Auth & Storage | Supabase              | User authentication and notes storage | Free tier available        |
@@ -66,12 +81,18 @@ notetex/
 
 ```
 
+## Recent Updates
+
+- ✅ **LaTeX Autocomplete Implementation**: Added intelligent autocomplete for LaTeX commands with dropdown suggestions, keyboard navigation, and smart cursor positioning.
+
 ## Future Improvements
 
 - Real-time collaboration  
-- LaTeX autocomplete/snippets  
+- Enhanced LaTeX autocomplete with context-aware suggestions and custom snippets
 - Export/import project ZIP files  
 - Offline support (PWA)  
 - Subscription payment integration
+- Syntax highlighting for LaTeX code
+- Error highlighting and LaTeX syntax validation
 
 © 2025 Automated Tutoring and Intelligence Techologies. All rights reserved.

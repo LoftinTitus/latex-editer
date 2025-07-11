@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX Autocomplete Test</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/editor.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div x-data="autocompleteTest()" x-init="init()" class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">LaTeX Autocomplete Test</h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Instructions</h2>
+            <ul class="list-disc pl-6 space-y-2">
+                <li>Type <code>\</code> in the textarea below to trigger autocomplete</li>
+                <li>Continue typing to filter suggestions (e.g., <code>\beg</code>, <code>\sec</code>, <code>\frac</code>)</li>
+                <li>Use ↑/↓ arrow keys to navigate suggestions</li>
+                <li>Press Tab, Enter, or click to select a suggestion</li>
+                <li>Press Escape to close the autocomplete dropdown</li>
+            </ul>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Test Area</h2>
+            <div class="relative">
+                <textarea 
+                    x-ref="latexTextarea"
+                    x-model="content"
+                    placeholder="Type \ to test autocomplete..."
+                    class="w-full h-64 p-4 border border-gray-300 rounded-md font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    @input="onTextareaInput($event)"
+                ></textarea>
+                
+                <!-- Autocomplete Dropdown -->
+                <div 
+                    x-show="autocomplete.showing" 
+                    x-transition
+                    class="autocomplete-dropdown fixed bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto z-50"
+                    :style="`top: ${autocomplete.dropdownPosition.top}px; left: ${autocomplete.dropdownPosition.left}px; width: 250px;`"
+                >
+                    <template x-for="(suggestion, index) in autocomplete.suggestions" :key="index">
+                        <div 
+                            @click="selectAutocompleteSuggestion(index)"
+                            :class="index === autocomplete.selectedIndex ? 'bg-blue-100' : 'hover:bg-gray-100'"
+                            class="px-3 py-2 cursor-pointer font-mono text-sm border-b border-gray-100 last:border-b-0"
+                            x-text="suggestion"
+                        ></div>
+                    </template>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-sm text-gray-600">
+                <p><strong>Current content:</strong></p>
+                <pre x-text="content" class="bg-gray-100 p-2 rounded mt-2 font-mono text-xs"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple LaTeX commands for testing
+        const LATEX_COMMANDS = [
+            '\\documentclass{article}',
+            '\\begin{document}',
+            '\\end{document}',
+            '\\section{}',
+            '\\subsection{}',
+            '\\begin{equation}',
+            '\\end{equation}',
+            '\\frac{}{}',
+            '\\textbf{}',
+            '\\textit{}',
+            '\\alpha',
+            '\\beta',
+            '\\gamma'
+        ];
+
+        function autocompleteTest() {
+            return {
+                content: '',
+                autocomplete: {
+                    showing: false,
+                    suggestions: [],
+                    selectedIndex: -1,
+                    triggerPos: -1,
+                    searchTerm: '',
+                    dropdownPosition: { top: 0, left: 0 }
+                },
+
+                init() {
+                    document.addEventListener('keydown', (e) => this.handleGlobalKeyDown(e));
+                },
+
+                onTextareaInput(event) {
+                    const textarea = event.target;
+                    const cursorPos = textarea.selectionStart;
+                    const text = textarea.value;
+                    
+                    this.checkAutocomplete(text, cursorPos, textarea);
+                },
+
+                checkAutocomplete(text, cursorPos, textarea) {
+                    let backslashPos = -1;
+                    for (let i = cursorPos - 1; i >= 0; i--) {
+                        if (text[i] === '\\') {
+                            backslashPos = i;
+                            break;
+                        }
+                        if (/\s/.test(text[i]) || text[i] === '}' || text[i] === '{' || text[i] === '$') {
+                            break;
+                        }
+                    }
+
+                    if (backslashPos !== -1) {
+                        const searchTerm = text.substring(backslashPos, cursorPos);
+                        
+                        if (searchTerm.length >= 1) {
+                            this.showAutocomplete(searchTerm, backslashPos, textarea);
+                        } else {
+                            this.hideAutocomplete();
+                        }
+                    } else {
+                        this.hideAutocomplete();
+                    }
+                },
+
+                showAutocomplete(searchTerm, triggerPos, textarea) {
+                    const filtered = LATEX_COMMANDS.filter(cmd => 
+                        cmd.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+
+                    if (filtered.length === 0) {
+                        this.hideAutocomplete();
+                        return;
+                    }
+
+                    this.autocomplete.suggestions = filtered.slice(0, 10);
+                    this.autocomplete.triggerPos = triggerPos;
+                    this.autocomplete.searchTerm = searchTerm;
+                    this.autocomplete.selectedIndex = -1;
+                    this.autocomplete.showing = true;
+
+                    this.positionAutocompleteDropdown(textarea, triggerPos);
+                },
+
+                hideAutocomplete() {
+                    this.autocomplete.showing = false;
+                    this.autocomplete.suggestions = [];
+                    this.autocomplete.selectedIndex = -1;
+                },
+
+                positionAutocompleteDropdown(textarea, triggerPos) {
+                    const rect = textarea.getBoundingClientRect();
+                    const style = window.getComputedStyle(textarea);
+                    const lineHeight = parseInt(style.lineHeight) || 20;
+                    
+                    const textBeforeCursor = textarea.value.substring(0, triggerPos);
+                    const lines = textBeforeCursor.split('\n');
+                    const currentLine = lines.length - 1;
+                    const currentCol = lines[lines.length - 1].length;
+                    
+                    const charWidth = 8;
+                    const top = rect.top + (currentLine * lineHeight) + 30 + window.scrollY;
+                    const left = rect.left + (currentCol * charWidth) + 10;
+                    
+                    this.autocomplete.dropdownPosition = { top, left };
+                },
+
+                selectAutocompleteSuggestion(index) {
+                    if (index >= 0 && index < this.autocomplete.suggestions.length) {
+                        this.autocomplete.selectedIndex = index;
+                        this.applyAutocomplete(this.autocomplete.suggestions[index]);
+                    }
+                },
+
+                applyAutocomplete(suggestion) {
+                    const textarea = this.$refs.latexTextarea;
+                    if (!textarea) return;
+
+                    const cursorPos = textarea.selectionStart;
+                    const text = textarea.value;
+                    
+                    const beforeTrigger = text.substring(0, this.autocomplete.triggerPos);
+                    const afterCursor = text.substring(cursorPos);
+                    
+                    let newCursorPos;
+                    if (suggestion.includes('{}')) {
+                        const braceIndex = suggestion.indexOf('{}');
+                        newCursorPos = this.autocomplete.triggerPos + braceIndex + 1;
+                        this.content = beforeTrigger + suggestion + afterCursor;
+                    } else {
+                        newCursorPos = this.autocomplete.triggerPos + suggestion.length;
+                        this.content = beforeTrigger + suggestion + afterCursor;
+                    }
+                    
+                    this.hideAutocomplete();
+                    
+                    setTimeout(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(newCursorPos, newCursorPos);
+                    }, 0);
+                },
+
+                handleGlobalKeyDown(event) {
+                    if (!this.autocomplete.showing) return;
+
+                    switch (event.key) {
+                        case 'ArrowDown':
+                            event.preventDefault();
+                            this.autocomplete.selectedIndex = Math.min(
+                                this.autocomplete.selectedIndex + 1,
+                                this.autocomplete.suggestions.length - 1
+                            );
+                            break;
+                        case 'ArrowUp':
+                            event.preventDefault();
+                            this.autocomplete.selectedIndex = Math.max(
+                                this.autocomplete.selectedIndex - 1,
+                                -1
+                            );
+                            break;
+                        case 'Enter':
+                        case 'Tab':
+                            event.preventDefault();
+                            if (this.autocomplete.selectedIndex >= 0) {
+                                this.selectAutocompleteSuggestion(this.autocomplete.selectedIndex);
+                            } else if (this.autocomplete.suggestions.length > 0) {
+                                this.selectAutocompleteSuggestion(0);
+                            }
+                            break;
+                        case 'Escape':
+                            event.preventDefault();
+                            this.hideAutocomplete();
+                            break;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>

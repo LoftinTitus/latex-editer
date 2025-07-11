@@ -1,5 +1,40 @@
 /* Custom styles for the LaTeX Editor */
 
+/* Autocomplete dropdown styling */
+.autocomplete-dropdown {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 200px;
+  min-width: 200px;
+  z-index: 1000;
+}
+
+.autocomplete-dropdown div {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.autocomplete-dropdown div:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-dropdown div:hover {
+  background-color: #f9fafb;
+}
+
+.autocomplete-dropdown div.selected,
+.autocomplete-dropdown div:focus {
+  background-color: #dbeafe;
+  outline: none;
+}
+
 /* Editor enhancements */
 .editor-container {
   position: relative;

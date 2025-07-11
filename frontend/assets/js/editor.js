@@ -1,6 +1,191 @@
 // API configuration
 const API_BASE_URL = 'http://localhost:8000';
 
+// LaTeX commands for autocomplete
+const LATEX_COMMANDS = [
+  // Document structure
+  '\\documentclass{article}',
+  '\\documentclass{book}',
+  '\\documentclass{report}',
+  '\\documentclass{letter}',
+  '\\documentclass{beamer}',
+  '\\begin{document}',
+  '\\end{document}',
+  '\\maketitle',
+  '\\tableofcontents',
+  
+  // Packages
+  '\\usepackage{amsmath}',
+  '\\usepackage{amsfonts}',
+  '\\usepackage{amssymb}',
+  '\\usepackage{graphicx}',
+  '\\usepackage{hyperref}',
+  '\\usepackage{geometry}',
+  '\\usepackage{babel}',
+  '\\usepackage{inputenc}',
+  '\\usepackage{fontenc}',
+  
+  // Sections
+  '\\section{}',
+  '\\subsection{}',
+  '\\subsubsection{}',
+  '\\paragraph{}',
+  '\\subparagraph{}',
+  '\\chapter{}',
+  '\\part{}',
+  
+  // Environments
+  '\\begin{equation}',
+  '\\end{equation}',
+  '\\begin{align}',
+  '\\end{align}',
+  '\\begin{itemize}',
+  '\\end{itemize}',
+  '\\begin{enumerate}',
+  '\\end{enumerate}',
+  '\\begin{description}',
+  '\\end{description}',
+  '\\begin{figure}',
+  '\\end{figure}',
+  '\\begin{table}',
+  '\\end{table}',
+  '\\begin{center}',
+  '\\end{center}',
+  '\\begin{flushleft}',
+  '\\end{flushleft}',
+  '\\begin{flushright}',
+  '\\end{flushright}',
+  '\\begin{verbatim}',
+  '\\end{verbatim}',
+  '\\begin{quote}',
+  '\\end{quote}',
+  '\\begin{quotation}',
+  '\\end{quotation}',
+  
+  // Math environments
+  '\\begin{matrix}',
+  '\\end{matrix}',
+  '\\begin{pmatrix}',
+  '\\end{pmatrix}',
+  '\\begin{bmatrix}',
+  '\\end{bmatrix}',
+  '\\begin{vmatrix}',
+  '\\end{vmatrix}',
+  '\\begin{Vmatrix}',
+  '\\end{Vmatrix}',
+  '\\begin{cases}',
+  '\\end{cases}',
+  
+  // Text formatting
+  '\\textbf{}',
+  '\\textit{}',
+  '\\underline{}',
+  '\\emph{}',
+  '\\texttt{}',
+  '\\textrm{}',
+  '\\textsf{}',
+  '\\textsc{}',
+  '\\textsl{}',
+  '\\tiny',
+  '\\scriptsize',
+  '\\footnotesize',
+  '\\small',
+  '\\normalsize',
+  '\\large',
+  '\\Large',
+  '\\LARGE',
+  '\\huge',
+  '\\Huge',
+  
+  // Math symbols and commands
+  '\\frac{}{}',
+  '\\sqrt{}',
+  '\\sum',
+  '\\prod',
+  '\\int',
+  '\\lim',
+  '\\sin',
+  '\\cos',
+  '\\tan',
+  '\\log',
+  '\\ln',
+  '\\exp',
+  '\\alpha',
+  '\\beta',
+  '\\gamma',
+  '\\delta',
+  '\\epsilon',
+  '\\theta',
+  '\\lambda',
+  '\\mu',
+  '\\pi',
+  '\\sigma',
+  '\\phi',
+  '\\psi',
+  '\\omega',
+  '\\Alpha',
+  '\\Beta',
+  '\\Gamma',
+  '\\Delta',
+  '\\Theta',
+  '\\Lambda',
+  '\\Pi',
+  '\\Sigma',
+  '\\Phi',
+  '\\Psi',
+  '\\Omega',
+  '\\infty',
+  '\\partial',
+  '\\nabla',
+  '\\pm',
+  '\\mp',
+  '\\times',
+  '\\div',
+  '\\neq',
+  '\\leq',
+  '\\geq',
+  '\\approx',
+  '\\equiv',
+  '\\subset',
+  '\\supset',
+  '\\subseteq',
+  '\\supseteq',
+  '\\in',
+  '\\notin',
+  '\\cup',
+  '\\cap',
+  '\\emptyset',
+  '\\exists',
+  '\\forall',
+  '\\rightarrow',
+  '\\leftarrow',
+  '\\leftrightarrow',
+  '\\Rightarrow',
+  '\\Leftarrow',
+  '\\Leftrightarrow',
+  
+  // References and labels
+  '\\label{}',
+  '\\ref{}',
+  '\\cite{}',
+  '\\bibliography{}',
+  '\\bibliographystyle{}',
+  
+  // Lists
+  '\\item',
+  
+  // Spacing
+  '\\vspace{}',
+  '\\hspace{}',
+  '\\newpage',
+  '\\clearpage',
+  '\\linebreak',
+  '\\nolinebreak',
+  '\\pagebreak',
+  '\\nopagebreak',
+  '\\\\'
+];
+
 // Alpine.js component for the LaTeX editor
 function latexEditor() {
   return {
@@ -16,6 +201,16 @@ function latexEditor() {
     currentNoteTitle: '',
     showNotesModal: false,
     showSaveModal: false,
+
+    // Autocomplete state
+    autocomplete: {
+      showing: false,
+      suggestions: [],
+      selectedIndex: -1,
+      triggerPos: -1,
+      searchTerm: '',
+      dropdownPosition: { top: 0, left: 0 }
+    },
 
     // Debounced auto-save function
     debouncedAutoSave: null,
@@ -37,6 +232,9 @@ function latexEditor() {
         }
       }, 2000);
 
+      // Set up autocomplete keyboard handling
+      document.addEventListener('keydown', (e) => this.handleGlobalKeyDown(e));
+
       // Listen for auth state changes
       authHelpers.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN') {
@@ -53,6 +251,171 @@ function latexEditor() {
       // Load example content on first visit
       if (!this.latexContent.trim()) {
         this.loadExample();
+      }
+    },
+
+    // Autocomplete methods
+    onTextareaInput(event) {
+      const textarea = event.target;
+      const cursorPos = textarea.selectionStart;
+      const text = textarea.value;
+      
+      // Auto-save
+      this.debouncedAutoSave();
+      
+      // Check for autocomplete trigger
+      this.checkAutocomplete(text, cursorPos, textarea);
+    },
+
+    checkAutocomplete(text, cursorPos, textarea) {
+      // Look backwards from cursor to find backslash
+      let backslashPos = -1;
+      for (let i = cursorPos - 1; i >= 0; i--) {
+        if (text[i] === '\\') {
+          backslashPos = i;
+          break;
+        }
+        // If we hit whitespace or another command, stop
+        if (/\s/.test(text[i]) || text[i] === '}' || text[i] === '{' || text[i] === '$') {
+          break;
+        }
+      }
+
+      if (backslashPos !== -1) {
+        const searchTerm = text.substring(backslashPos, cursorPos);
+        
+        // Only show autocomplete if we have at least backslash + one character
+        if (searchTerm.length >= 2) {
+          this.showAutocomplete(searchTerm, backslashPos, textarea);
+        } else if (searchTerm.length === 1 && searchTerm === '\\') {
+          // Show all commands when just backslash is typed
+          this.showAutocomplete('\\', backslashPos, textarea);
+        } else {
+          this.hideAutocomplete();
+        }
+      } else {
+        this.hideAutocomplete();
+      }
+    },
+
+    showAutocomplete(searchTerm, triggerPos, textarea) {
+      // Filter commands based on search term
+      const filtered = LATEX_COMMANDS.filter(cmd => 
+        cmd.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      if (filtered.length === 0) {
+        this.hideAutocomplete();
+        return;
+      }
+
+      this.autocomplete.suggestions = filtered.slice(0, 10); // Limit to 10 suggestions
+      this.autocomplete.triggerPos = triggerPos;
+      this.autocomplete.searchTerm = searchTerm;
+      this.autocomplete.selectedIndex = -1;
+      this.autocomplete.showing = true;
+
+      // Position the dropdown
+      this.positionAutocompleteDropdown(textarea, triggerPos);
+    },
+
+    hideAutocomplete() {
+      this.autocomplete.showing = false;
+      this.autocomplete.suggestions = [];
+      this.autocomplete.selectedIndex = -1;
+    },
+
+    positionAutocompleteDropdown(textarea, triggerPos) {
+      // Get textarea position and dimensions
+      const rect = textarea.getBoundingClientRect();
+      const style = window.getComputedStyle(textarea);
+      const lineHeight = parseInt(style.lineHeight) || 20;
+      
+      // Calculate approximate cursor position
+      const textBeforeCursor = textarea.value.substring(0, triggerPos);
+      const lines = textBeforeCursor.split('\n');
+      const currentLine = lines.length - 1;
+      const currentCol = lines[lines.length - 1].length;
+      
+      // Estimate position (this is approximate due to font metrics)
+      const charWidth = 8; // Approximate character width for monospace font
+      const top = rect.top + (currentLine * lineHeight) + 30 + window.scrollY;
+      const left = rect.left + (currentCol * charWidth) + 10;
+      
+      this.autocomplete.dropdownPosition = { top, left };
+    },
+
+    selectAutocompleteSuggestion(index) {
+      if (index >= 0 && index < this.autocomplete.suggestions.length) {
+        this.autocomplete.selectedIndex = index;
+        this.applyAutocomplete(this.autocomplete.suggestions[index]);
+      }
+    },
+
+    applyAutocomplete(suggestion) {
+      const textarea = this.$refs.latexTextarea;
+      if (!textarea) return;
+
+      const cursorPos = textarea.selectionStart;
+      const text = textarea.value;
+      
+      // Replace the search term with the suggestion
+      const beforeTrigger = text.substring(0, this.autocomplete.triggerPos);
+      const afterCursor = text.substring(cursorPos);
+      
+      // For commands with braces, position cursor inside the braces
+      let newCursorPos;
+      if (suggestion.includes('{}')) {
+        // Find the first occurrence of {} and position cursor inside
+        const braceIndex = suggestion.indexOf('{}');
+        newCursorPos = this.autocomplete.triggerPos + braceIndex + 1;
+        this.latexContent = beforeTrigger + suggestion + afterCursor;
+      } else {
+        newCursorPos = this.autocomplete.triggerPos + suggestion.length;
+        this.latexContent = beforeTrigger + suggestion + afterCursor;
+      }
+      
+      this.hideAutocomplete();
+      
+      // Set cursor position after the update
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    },
+
+    handleGlobalKeyDown(event) {
+      if (!this.autocomplete.showing) return;
+
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault();
+          this.autocomplete.selectedIndex = Math.min(
+            this.autocomplete.selectedIndex + 1,
+            this.autocomplete.suggestions.length - 1
+          );
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          this.autocomplete.selectedIndex = Math.max(
+            this.autocomplete.selectedIndex - 1,
+            -1
+          );
+          break;
+        case 'Enter':
+        case 'Tab':
+          event.preventDefault();
+          if (this.autocomplete.selectedIndex >= 0) {
+            this.selectAutocompleteSuggestion(this.autocomplete.selectedIndex);
+          } else if (this.autocomplete.suggestions.length > 0) {
+            // Select first suggestion if none is selected
+            this.selectAutocompleteSuggestion(0);
+          }
+          break;
+        case 'Escape':
+          event.preventDefault();
+          this.hideAutocomplete();
+          break;
       }
     },
 
