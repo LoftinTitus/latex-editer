@@ -4,14 +4,14 @@
 
 This project is a lightweight web application that allows users to write LaTeX code, compile it to PDF on the server, view and download the resulting PDF, and manage their LaTeX notes with user authentication. The app is designed to be simple, fast, and affordable, targeting students, researchers, and hobbyists.
 
-The tech stack includes Alpine.js for the frontend, FastAPI (Python) for the backend, Supabase for authentication and data storage, Fly.io for backend hosting, and Cloudflare Pages or GitHub Pages for frontend hosting. The architecture prioritizes low cost or free usage where possible.
+The tech stack includes Alpine.js for the frontend, FastAPI (Python) for the backend, Supabase for authentication and data storage, Fly.io for backend hosting, and GitHub Pages for frontend hosting. The architecture prioritizes low cost or free usage where possible.
 
 ---
 
 ## Features
 
 - Text editor with LaTeX syntax input using `<textarea>` enhanced with Alpine.js for reactive UI
-- Server-side LaTeX compilation to PDF using Tectonic or pdflatex
+- Server-side LaTeX compilation to PDF using Tectonic
 - Inline PDF preview within the browser using an iframe
 - User registration and login with email/password via Supabase authentication
 - Save, load, update, and delete notes stored in Supabase Postgres database
