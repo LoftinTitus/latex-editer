@@ -52,17 +52,18 @@ notetex/
 ├── backend/
 │   ├── main.py             # FastAPI application entry point
 │   ├── compiler.py         # LaTeX compilation logic
-│   ├── models.py           # Database models or schema
+│   ├── auth.py           # auth
 │   ├── requirements.txt    # Python dependencies
 │   └── Dockerfile          # Docker container configuration for deployment
+    └── supabase/
+      └── supabase.js
 ├── frontend/
 │   ├── index.html          # Main application page using Alpine.js
 │   ├── login.html          # Login and signup page integrated with Supabase
 │   └── assets/
 │       ├── css/
 │       └── js/
-├── supabase/
-│   └── supabase.js         # JavaScript SDK configuration 
+
 ```
 
 ## Future Improvements

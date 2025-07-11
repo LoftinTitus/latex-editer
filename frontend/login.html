@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - LaTeX Editor</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/auth.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="auth-background flex items-center justify-center">
+    <div x-data="authPage()" x-init="init()" class="auth-container">
+        <!-- Login/Signup Form -->
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <h1 class="auth-title">LaTeX Editor</h1>
+                <p class="auth-subtitle">Create and compile LaTeX documents online</p>
+            </div>
+
+            <!-- Form Container -->
+            <div class="auth-form">
+                <!-- Status Messages -->
+                <template x-if="status">
+                    <div 
+                        x-show="status"
+                        x-transition
+                        :class="status.type === 'error' ? 'status-message error' : 'status-message success'"
+                    >
+                        <p x-text="status.message"></p>
+                    </div>
+                </template>
+
+                <!-- Tab Switcher -->
+                <div class="tab-container">
+                    <button 
+                        @click="activeTab = 'login'"
+                        :class="activeTab === 'login' ? 'tab-button active' : 'tab-button'"
+                    >
+                        Login
+                    </button>
+                    <button 
+                        @click="activeTab = 'signup'"
+                        :class="activeTab === 'signup' ? 'tab-button active' : 'tab-button'"
+                    >
+                        Sign Up
+                    </button>
+                </div>
+
+                <!-- Login Form -->
+                <form x-show="activeTab === 'login'" @submit.prevent="login()">
+                    <div class="form-group">
+                        <label for="loginEmail" class="form-label">
+                            Email Address
+                        </label>
+                        <input 
+                            type="email" 
+                            id="loginEmail"
+                            x-model="loginForm.email"
+                            required
+                            class="form-input"
+                            placeholder="Enter your email"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginPassword" class="form-label">
+                            Password
+                        </label>
+                        <input 
+                            type="password" 
+                            id="loginPassword"
+                            x-model="loginForm.password"
+                            required
+                            class="form-input"
+                            placeholder="Enter your password"
+                        >
+                    </div>
+
+                    <button 
+                        type="submit"
+                        :disabled="loading"
+                        class="auth-button primary"
+                        style="margin-bottom: 1rem;"
+                    >
+                        <template x-if="loading">
+                            <div class="loading-spinner"></div>
+                        </template>
+                        <span x-text="loading ? 'Signing In...' : 'Sign In'"></span>
+                    </button>
+
+                    <div style="text-align: center; margin-bottom: 1rem;">
+                        <button 
+                            type="button"
+                            @click="showForgotPassword = true"
+                            class="forgot-password-link"
+                        >
+                            Forgot your password?
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Signup Form -->
+                <form x-show="activeTab === 'signup'" @submit.prevent="signup()">
+                    <div class="form-group">
+                        <label for="signupEmail" class="form-label">
+                            Email Address
+                        </label>
+                        <input 
+                            type="email" 
+                            id="signupEmail"
+                            x-model="signupForm.email"
+                            required
+                            class="form-input"
+                            placeholder="Enter your email"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="signupPassword" class="form-label">
+                            Password
+                        </label>
+                        <input 
+                            type="password" 
+                            id="signupPassword"
+                            x-model="signupForm.password"
+                            required
+                            minlength="6"
+                            class="form-input"
+                            placeholder="Choose a password (min. 6 characters)"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword" class="form-label">
+                            Confirm Password
+                        </label>
+                        <input 
+                            type="password" 
+                            id="confirmPassword"
+                            x-model="signupForm.confirmPassword"
+                            required
+                            class="form-input"
+                            placeholder="Confirm your password"
+                        >
+                    </div>
+
+                    <button 
+                        type="submit"
+                        :disabled="loading || signupForm.password !== signupForm.confirmPassword"
+                        class="auth-button success"
+                        style="margin-bottom: 1rem;"
+                    >
+                        <template x-if="loading">
+                            <div class="loading-spinner"></div>
+                        </template>
+                        <span x-text="loading ? 'Creating Account...' : 'Create Account'"></span>
+                    </button>
+
+                    <template x-if="signupForm.password !== signupForm.confirmPassword && signupForm.confirmPassword.length > 0">
+                        <p class="password-mismatch">Passwords do not match</p>
+                    </template>
+                </form>
+
+                <!-- Forgot Password Modal -->
+                <div x-show="showForgotPassword" x-transition class="modal-overlay">
+                    <div class="modal-content">
+                        <h3 class="modal-title">Reset Password</h3>
+                        <form @submit.prevent="resetPassword()">
+                            <div class="form-group">
+                                <label for="resetEmail" class="form-label">
+                                    Email Address
+                                </label>
+                                <input 
+                                    type="email" 
+                                    id="resetEmail"
+                                    x-model="resetForm.email"
+                                    required
+                                    class="form-input"
+                                    placeholder="Enter your email"
+                                >
+                            </div>
+                            <div class="modal-buttons">
+                                <button 
+                                    type="submit"
+                                    :disabled="loading"
+                                    class="auth-button primary"
+                                    style="flex: 1;"
+                                >
+                                    Send Reset Link
+                                </button>
+                                <button 
+                                    type="button"
+                                    @click="showForgotPassword = false; resetForm.email = ''"
+                                    class="auth-button secondary"
+                                    style="flex: 1;"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Continue without login -->
+                <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; text-align: center;">
+                    <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.75rem;">
+                        Want to try the editor without an account?
+                    </p>
+                    <a 
+                        href="./index.html" 
+                        class="auth-button guest"
+                    >
+                        Continue as Guest
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="features-section">
+            <h2 class="features-title">Why Create an Account?</h2>
+            <ul class="features-list">
+                <li class="feature-item">
+                    <svg class="feature-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Save and manage your LaTeX documents
+                </li>
+                <li class="feature-item">
+                    <svg class="feature-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Access your work from anywhere
+                </li>
+                <li class="feature-item">
+                    <svg class="feature-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Version history and backups
+                </li>
+                <li class="feature-item">
+                    <svg class="feature-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Free to use forever
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="./assets/js/supabase-config.js"></script>
+    <script src="./assets/js/auth.js"></script>
+</body>
+</html>

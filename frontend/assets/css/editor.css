@@ -1,0 +1,233 @@
+/* Custom styles for the LaTeX Editor */
+
+/* Editor enhancements */
+.editor-container {
+  position: relative;
+}
+
+/* Textarea styling for LaTeX editing */
+textarea {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  tab-size: 2;
+}
+
+/* Syntax highlighting hint styles */
+.latex-keyword {
+  color: #d73a49;
+  font-weight: bold;
+}
+
+.latex-command {
+  color: #6f42c1;
+}
+
+.latex-comment {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.latex-math {
+  color: #005cc5;
+  background-color: #f6f8fa;
+}
+
+/* Loading animation */
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* PDF viewer styling */
+.pdf-container {
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pdf-container iframe {
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
+/* Status message animations */
+.status-message {
+  transition: all 0.3s ease-in-out;
+}
+
+.status-message.fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.status-message.fade-out {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Document card hover effects */
+.document-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Button enhancements */
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  border: none;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  border: none;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .grid-cols-1.lg\\:grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .container {
+    padding: 1rem;
+  }
+  
+  .text-2xl {
+    font-size: 1.5rem;
+  }
+  
+  .h-96 {
+    height: 16rem;
+  }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .bg-gray-100 {
+    background-color: #1a202c;
+  }
+  
+  .bg-white {
+    background-color: #2d3748;
+  }
+  
+  .text-gray-800 {
+    color: #e2e8f0;
+  }
+  
+  .text-gray-600 {
+    color: #a0aec0;
+  }
+  
+  .border-gray-300 {
+    border-color: #4a5568;
+  }
+}
+
+/* Animation for compile button */
+.compile-btn.compiling {
+  position: relative;
+  color: transparent;
+}
+
+.compile-btn.compiling::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s ease-in-out infinite;
+}
+
+/* Tooltip styles */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: #555;
+  color: white;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -60px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 12px;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Character counter styling */
+.char-counter {
+  font-size: 0.75rem;
+  color: #6b7280;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Focus styles for accessibility */
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+}

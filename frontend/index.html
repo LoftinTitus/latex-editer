@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX Editor</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/editor.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div x-data="latexEditor()" x-init="init()" class="container mx-auto p-4">
+        <!-- Header -->
+        <header class="bg-white shadow-md rounded-lg mb-6 p-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">LaTeX Editor</h1>
+                <div class="flex items-center space-x-4">
+                    <template x-if="user">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-600" x-text="user.email"></span>
+                            <button 
+                                @click="logout()"
+                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition duration-200"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </template>
+                    <template x-if="!user">
+                        <a href="./login.html" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition duration-200">
+                            Login
+                        </a>
+                    </template>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Editor Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- LaTeX Input -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">LaTeX Source</h2>
+                <div class="relative">
+                    <textarea 
+                        x-model="latexContent"
+                        placeholder="Enter your LaTeX code here..."
+                        class="w-full h-96 p-4 border border-gray-300 rounded-md font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        @input="debouncedAutoSave()"
+                    ></textarea>
+                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">
+                        <span x-text="latexContent.length"></span> characters
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex justify-between items-center mt-4">
+                    <div class="flex space-x-2">
+                        <button 
+                            @click="compile()"
+                            :disabled="compiling || !latexContent.trim()"
+                            class="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-6 py-2 rounded-md transition duration-200 flex items-center"
+                        >
+                            <template x-if="compiling">
+                                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </template>
+                            <span x-text="compiling ? 'Compiling...' : 'Compile PDF'"></span>
+                        </button>
+                        
+                        <button 
+                            @click="clearEditor()"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition duration-200"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <template x-if="user">
+                            <button 
+                                @click="saveDocument()"
+                                :disabled="saving"
+                                class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition duration-200"
+                            >
+                                <span x-text="saving ? 'Saving...' : 'Save'"></span>
+                            </button>
+                        </template>
+                        
+                        <button 
+                            @click="loadExample()"
+                            class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition duration-200"
+                        >
+                            Load Example
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output/Preview -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Output</h2>
+                
+                <!-- Status Messages -->
+                <template x-if="status">
+                    <div 
+                        x-show="status"
+                        x-transition
+                        :class="status.type === 'error' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-green-100 border-green-500 text-green-700'"
+                        class="border-l-4 p-4 mb-4"
+                    >
+                        <p x-text="status.message"></p>
+                    </div>
+                </template>
+
+                <!-- PDF Preview -->
+                <div class="h-96 border border-gray-300 rounded-md overflow-hidden">
+                    <template x-if="pdfUrl">
+                        <iframe 
+                            :src="pdfUrl" 
+                            class="w-full h-full"
+                            title="PDF Preview"
+                        ></iframe>
+                    </template>
+                    <template x-if="!pdfUrl">
+                        <div class="flex items-center justify-center h-full text-gray-500">
+                            <div class="text-center">
+                                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p>Compile your LaTeX to see the PDF preview</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Download Button -->
+                <template x-if="pdfUrl">
+                    <div class="mt-4 text-center">
+                        <a 
+                            :href="pdfUrl" 
+                            download="document.pdf"
+                            class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-md transition duration-200"
+                        >
+                            Download PDF
+                        </a>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Recent Documents (for logged-in users) -->
+        <template x-if="user && documents.length > 0">
+            <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Recent Documents</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="doc in documents" :key="doc.id">
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                            <h3 class="font-medium text-gray-800 mb-2" x-text="doc.title || 'Untitled Document'"></h3>
+                            <p class="text-sm text-gray-600 mb-3" x-text="formatDate(doc.updated_at)"></p>
+                            <div class="flex space-x-2">
+                                <button 
+                                    @click="loadDocument(doc)"
+                                    class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition duration-200"
+                                >
+                                    Load
+                                </button>
+                                <button 
+                                    @click="deleteDocument(doc.id)"
+                                    class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition duration-200"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script src="./assets/js/supabase-config.js"></script>
+    <script src="./assets/js/editor.js"></script>
+</body>
+</html>
