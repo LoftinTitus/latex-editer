@@ -18,8 +18,7 @@ npm install @supabase/supabase-js
 
 For the backend (Python):
 ```bash
-cd backend
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 2. Environment Variables
@@ -31,7 +30,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-#### Backend (backend/.env)
+#### Backend (.env)
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_JWT_SECRET=your-jwt-secret-key
@@ -51,7 +50,7 @@ SUPABASE_SERVICE_KEY=your-service-role-key
 #### Wrap your app with the AuthProvider:
 
 ```jsx
-import { AuthProvider } from './backend/supabase/AuthContext'
+import { AuthProvider } from './supabase/AuthContext'
 
 function App() {
   return (
@@ -65,7 +64,7 @@ function App() {
 #### Use authentication in components:
 
 ```jsx
-import { useAuth } from './backend/supabase/AuthContext'
+import { useAuth } from './supabase/AuthContext'
 
 function LoginForm() {
   const { signIn, signUp, user } = useAuth()
@@ -85,7 +84,7 @@ function LoginForm() {
 #### Make authenticated API calls:
 
 ```jsx
-import { useAuthenticatedFetch } from './backend/supabase/AuthContext'
+import { useAuthenticatedFetch } from './supabase/AuthContext'
 
 function CompileDocument() {
   const authenticatedFetch = useAuthenticatedFetch()
@@ -103,7 +102,7 @@ function CompileDocument() {
 #### Protect routes:
 
 ```jsx
-import { withAuth } from './backend/supabase/AuthContext'
+import { withAuth } from './supabase/AuthContext'
 
 const ProtectedComponent = withAuth(({ user }) => {
   return <div>Welcome, {user.email}!</div>
