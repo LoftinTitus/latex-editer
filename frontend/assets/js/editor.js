@@ -1,3 +1,6 @@
+// API configuration
+const API_BASE_URL = 'http://localhost:8000';
+
 // Alpine.js component for the LaTeX editor
 function latexEditor() {
   return {
@@ -8,8 +11,11 @@ function latexEditor() {
     saving: false,
     user: null,
     status: null,
-    documents: [],
-    currentDocumentId: null,
+    notes: [],
+    currentNoteId: null,
+    currentNoteTitle: '',
+    showNotesModal: false,
+    showSaveModal: false,
 
     // Debounced auto-save function
     debouncedAutoSave: null,
@@ -19,9 +25,9 @@ function latexEditor() {
       // Check for existing session
       await this.checkAuth();
       
-      // Load user documents if logged in
+      // Load user notes if logged in
       if (this.user) {
-        await this.loadUserDocuments();
+        await this.loadUserNotes();
       }
 
       // Set up auto-save with debouncing
@@ -35,11 +41,12 @@ function latexEditor() {
       authHelpers.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN') {
           this.user = session.user;
-          this.loadUserDocuments();
+          this.loadUserNotes();
         } else if (event === 'SIGNED_OUT') {
           this.user = null;
-          this.documents = [];
-          this.currentDocumentId = null;
+          this.notes = [];
+          this.currentNoteId = null;
+          this.currentNoteTitle = '';
         }
       });
 
@@ -68,31 +75,60 @@ function latexEditor() {
         return;
       }
 
+      if (!this.user) {
+        this.showStatus('Please log in to compile LaTeX documents.', 'error');
+        return;
+      }
+
       this.compiling = true;
       this.status = null;
 
       try {
-        const response = await fetch('/api/compile', {
+        // Get the current session for authentication
+        const session = await authHelpers.getCurrentSession();
+        if (!session?.access_token) {
+          throw new Error('Authentication required. Please log in.');
+        }
+
+        // Call the backend compile/pdf endpoint
+        const response = await fetch(`${API_BASE_URL}/compile/pdf`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
-            latex_content: this.latexContent,
-            user_id: this.user?.id || null
+            latex_content: this.latexContent
           })
         });
 
-        const result = await response.json();
-
         if (response.ok) {
-          // Create blob URL for PDF
-          const pdfBlob = new Blob([new Uint8Array(result.pdf_data)], { type: 'application/pdf' });
+          // Get the PDF blob from the response
+          const pdfBlob = await response.blob();
+          
+          // Clean up previous PDF URL to prevent memory leaks
+          if (this.pdfUrl) {
+            URL.revokeObjectURL(this.pdfUrl);
+          }
+          
+          // Create new blob URL for PDF preview
           this.pdfUrl = URL.createObjectURL(pdfBlob);
           
           this.showStatus('LaTeX compiled successfully!', 'success');
         } else {
-          throw new Error(result.error || 'Compilation failed');
+          // Handle error response
+          const errorText = await response.text();
+          let errorMessage = 'Compilation failed';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorMessage;
+          } catch {
+            // If response is not JSON, use the text directly
+            errorMessage = errorText || errorMessage;
+          }
+          
+          throw new Error(errorMessage);
         }
       } catch (error) {
         console.error('Compilation error:', error);
@@ -102,16 +138,30 @@ function latexEditor() {
       }
     },
 
-    // Clear the editor
+    // Clear the editor / Create new note
     clearEditor() {
-      if (this.latexContent.trim() && !confirm('Are you sure you want to clear the editor?')) {
+      if (this.latexContent.trim() && !confirm('Are you sure you want to clear the editor and start a new note?')) {
         return;
       }
       
       this.latexContent = '';
-      this.pdfUrl = null;
-      this.currentDocumentId = null;
+      this.currentNoteTitle = '';
+      
+      // Clean up PDF URL to prevent memory leaks
+      if (this.pdfUrl) {
+        URL.revokeObjectURL(this.pdfUrl);
+        this.pdfUrl = null;
+      }
+      
+      this.currentNoteId = null;
       this.status = null;
+      
+      // Show helpful message for new note
+      if (this.user) {
+        this.showStatus('Ready to create a new note!', 'success');
+      } else {
+        this.showStatus('Please log in to save your notes.', 'info');
+      }
     },
 
     // Load example LaTeX content
@@ -175,10 +225,10 @@ Start editing this content to create your own LaTeX document!
       this.showStatus('Example content loaded. Click "Compile PDF" to see the result.', 'success');
     },
 
-    // Save document for logged-in users
-    async saveDocument() {
+    // Save note for logged-in users
+    async saveNote() {
       if (!this.user) {
-        this.showStatus('Please log in to save documents.', 'error');
+        this.showStatus('Please log in to save notes.', 'error');
         return;
       }
 
@@ -187,27 +237,39 @@ Start editing this content to create your own LaTeX document!
         return;
       }
 
+      // Show save modal to get title
+      this.showSaveModal = true;
+    },
+
+    // Confirm save with title
+    async confirmSave(title) {
+      if (!title?.trim()) {
+        this.showStatus('Please enter a title for your note.', 'error');
+        return;
+      }
+
       this.saving = true;
+      this.showSaveModal = false;
 
       try {
-        const title = utils.generateTitle(this.latexContent);
-
-        if (this.currentDocumentId) {
-          // Update existing document
-          await dbHelpers.updateDocument(this.currentDocumentId, title, this.latexContent);
-          this.showStatus('Document updated successfully!', 'success');
+        if (this.currentNoteId) {
+          // Update existing note
+          await dbHelpers.updateNote(this.currentNoteId, title, this.latexContent, this.latexContent);
+          this.currentNoteTitle = title;
+          this.showStatus('Note updated successfully!', 'success');
         } else {
-          // Create new document
-          const newDoc = await dbHelpers.saveDocument(title, this.latexContent, this.user.id);
-          this.currentDocumentId = newDoc.id;
-          this.showStatus('Document saved successfully!', 'success');
+          // Create new note
+          const newNote = await dbHelpers.saveNote(title, this.latexContent, this.latexContent);
+          this.currentNoteId = newNote.id;
+          this.currentNoteTitle = title;
+          this.showStatus('Note saved successfully!', 'success');
         }
 
-        // Refresh documents list
-        await this.loadUserDocuments();
+        // Refresh notes list
+        await this.loadUserNotes();
       } catch (error) {
         console.error('Save error:', error);
-        this.showStatus(`Failed to save document: ${error.message}`, 'error');
+        this.showStatus(`Failed to save note: ${error.message}`, 'error');
       } finally {
         this.saving = false;
       }
@@ -215,63 +277,86 @@ Start editing this content to create your own LaTeX document!
 
     // Auto-save function
     async autoSave() {
-      if (!this.user || !this.latexContent.trim()) return;
+      if (!this.user || !this.latexContent.trim() || !this.currentNoteId) return;
 
       try {
-        const title = utils.generateTitle(this.latexContent);
-
-        if (this.currentDocumentId) {
-          await dbHelpers.updateDocument(this.currentDocumentId, title, this.latexContent);
-        } else {
-          const newDoc = await dbHelpers.saveDocument(title, this.latexContent, this.user.id);
-          this.currentDocumentId = newDoc.id;
-          await this.loadUserDocuments();
-        }
+        await dbHelpers.updateNote(this.currentNoteId, this.currentNoteTitle, this.latexContent, this.latexContent);
       } catch (error) {
         console.error('Auto-save error:', error);
       }
     },
 
-    // Load user's documents
-    async loadUserDocuments() {
+    // Load user's notes
+    async loadUserNotes() {
       if (!this.user) return;
 
       try {
-        this.documents = await dbHelpers.getUserDocuments(this.user.id);
+        this.notes = await dbHelpers.getUserNotes();
       } catch (error) {
-        console.error('Failed to load documents:', error);
+        console.error('Failed to load notes:', error);
+        this.showStatus('Failed to load notes. Please try again.', 'error');
+        this.notes = []; // Ensure notes is always an array
       }
     },
 
-    // Load a specific document
-    async loadDocument(document) {
-      this.latexContent = document.content;
-      this.currentDocumentId = document.id;
-      this.pdfUrl = null; // Clear previous PDF
-      this.showStatus(`Loaded document: ${document.title}`, 'success');
+    // Load a specific note
+    async loadNote(note) {
+      this.latexContent = note.content || note.latex_content || '';
+      this.currentNoteId = note.id;
+      this.currentNoteTitle = note.title;
+      
+      // Clean up previous PDF URL to prevent memory leaks
+      if (this.pdfUrl) {
+        URL.revokeObjectURL(this.pdfUrl);
+        this.pdfUrl = null;
+      }
+      
+      this.showStatus(`Loaded note: ${note.title}`, 'success');
     },
 
-    // Delete a document
-    async deleteDocument(documentId) {
-      if (!confirm('Are you sure you want to delete this document?')) {
+    // Delete a note
+    async deleteNote(noteId) {
+      if (!confirm('Are you sure you want to delete this note?')) {
         return;
       }
 
       try {
-        await dbHelpers.deleteDocument(documentId);
+        await dbHelpers.deleteNote(noteId);
         
-        // Clear editor if current document was deleted
-        if (this.currentDocumentId === documentId) {
+        // Clear editor if current note was deleted
+        if (this.currentNoteId === noteId) {
           this.clearEditor();
         }
         
-        // Refresh documents list
-        await this.loadUserDocuments();
-        this.showStatus('Document deleted successfully.', 'success');
+        // Refresh notes list
+        await this.loadUserNotes();
+        this.showStatus('Note deleted successfully.', 'success');
       } catch (error) {
         console.error('Delete error:', error);
-        this.showStatus(`Failed to delete document: ${error.message}`, 'error');
+        this.showStatus(`Failed to delete note: ${error.message}`, 'error');
       }
+    },
+
+    // Toggle notes modal
+    toggleNotesModal() {
+      this.showNotesModal = !this.showNotesModal;
+    },
+
+    // Legacy document functions for backward compatibility
+    async loadUserDocuments() {
+      return await this.loadUserNotes();
+    },
+
+    async loadDocument(doc) {
+      return await this.loadNote(doc);
+    },
+
+    async deleteDocument(docId) {
+      return await this.deleteNote(docId);
+    },
+
+    async saveDocument() {
+      return await this.saveNote();
     },
 
     // Logout function

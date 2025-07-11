@@ -100,84 +100,155 @@ const authHelpers = {
   }
 };
 
-// Database helper functions
-const dbHelpers = {
-  // Save a LaTeX document
-  saveDocument: async (title, content, userId) => {
-    try {
-      const { data, error } = await supabaseClient
-        .from('documents')
-        .insert([
-          {
-            title: title,
-            content: content,
-            user_id: userId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ])
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } catch (error) {
-      console.error('Save document error:', error.message);
-      throw error;
-    }
-  },
+// API configuration
+const API_BASE_URL = 'http://localhost:8000';
 
-  // Update a LaTeX document
-  updateDocument: async (documentId, title, content) => {
+// Helper function to get auth headers
+const getAuthHeaders = async () => {
+  const session = await authHelpers.getCurrentSession();
+  if (!session?.access_token) {
+    throw new Error('Authentication required');
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`
+  };
+};
+
+// Database helper functions - Updated to use backend API
+const dbHelpers = {
+  // Save a LaTeX note
+  saveNote: async (title, content, latexContent = null) => {
     try {
-      const { data, error } = await supabaseClient
-        .from('documents')
-        .update({
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/notes`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
           title: title,
           content: content,
-          updated_at: new Date().toISOString()
+          latex_content: latexContent
         })
-        .eq('id', documentId)
-        .select();
+      });
       
-      if (error) throw error;
-      return data[0];
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save note');
+      }
+      
+      return await response.json();
     } catch (error) {
-      console.error('Update document error:', error.message);
+      console.error('Save note error:', error.message);
       throw error;
     }
   },
 
-  // Get user's documents
+  // Update a LaTeX note
+  updateNote: async (noteId, title, content, latexContent = null) => {
+    try {
+      const headers = await getAuthHeaders();
+      const updateData = {};
+      if (title !== undefined) updateData.title = title;
+      if (content !== undefined) updateData.content = content;
+      if (latexContent !== undefined) updateData.latex_content = latexContent;
+      
+      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update note');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Update note error:', error.message);
+      throw error;
+    }
+  },
+
+  // Get user's notes
+  getUserNotes: async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/notes`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch notes');
+      }
+      
+      const result = await response.json();
+      return result.notes;
+    } catch (error) {
+      console.error('Get user notes error:', error.message);
+      throw error;
+    }
+  },
+
+  // Get a specific note
+  getNote: async (noteId) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to fetch note');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Get note error:', error.message);
+      throw error;
+    }
+  },
+
+  // Delete a note
+  deleteNote: async (noteId) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete note');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Delete note error:', error.message);
+      throw error;
+    }
+  },
+
+  // Legacy document functions for backward compatibility
+  saveDocument: async (title, content, userId) => {
+    return await dbHelpers.saveNote(title, content);
+  },
+
+  updateDocument: async (documentId, title, content) => {
+    return await dbHelpers.updateNote(documentId, title, content);
+  },
+
   getUserDocuments: async (userId) => {
-    try {
-      const { data, error } = await supabaseClient
-        .from('documents')
-        .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Get user documents error:', error.message);
-      throw error;
-    }
+    return await dbHelpers.getUserNotes();
   },
 
-  // Delete a document
   deleteDocument: async (documentId) => {
-    try {
-      const { error } = await supabaseClient
-        .from('documents')
-        .delete()
-        .eq('id', documentId);
-      
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Delete document error:', error.message);
-      throw error;
-    }
+    return await dbHelpers.deleteNote(documentId);
   }
 };
 
