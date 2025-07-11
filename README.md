@@ -47,6 +47,7 @@ The application consists of the following components interacting as below:
 ---
 
 ## Project Structure
+```
 notetex/
 ├── backend/
 │   ├── main.py             # FastAPI application entry point
@@ -62,7 +63,7 @@ notetex/
 │       └── js/
 ├── supabase/
 │   └── supabase.js         # JavaScript SDK configuration 
-
+```
 
 ## Future Improvements
 
