@@ -263,8 +263,10 @@ function latexEditor() {
       // Auto-save
       this.debouncedAutoSave();
       
-      // Check for autocomplete trigger
-      this.checkAutocomplete(text, cursorPos, textarea);
+      // Use requestAnimationFrame for smoother autocomplete updates
+      requestAnimationFrame(() => {
+        this.checkAutocomplete(text, cursorPos, textarea);
+      });
     },
 
     checkAutocomplete(text, cursorPos, textarea) {
@@ -286,10 +288,10 @@ function latexEditor() {
         
         // Only show autocomplete if we have at least backslash + one character
         if (searchTerm.length >= 2) {
-          this.showAutocomplete(searchTerm, backslashPos, textarea);
+          this.showAutocomplete(searchTerm, backslashPos, cursorPos, textarea);
         } else if (searchTerm.length === 1 && searchTerm === '\\') {
           // Show all commands when just backslash is typed
-          this.showAutocomplete('\\', backslashPos, textarea);
+          this.showAutocomplete('\\', backslashPos, cursorPos, textarea);
         } else {
           this.hideAutocomplete();
         }
@@ -298,7 +300,7 @@ function latexEditor() {
       }
     },
 
-    showAutocomplete(searchTerm, triggerPos, textarea) {
+    showAutocomplete(searchTerm, triggerPos, cursorPos, textarea) {
       // Filter commands based on search term
       const filtered = LATEX_COMMANDS.filter(cmd => 
         cmd.toLowerCase().includes(searchTerm.toLowerCase())
@@ -315,8 +317,8 @@ function latexEditor() {
       this.autocomplete.selectedIndex = -1;
       this.autocomplete.showing = true;
 
-      // Position the dropdown
-      this.positionAutocompleteDropdown(textarea, triggerPos);
+      // Position the dropdown right at the cursor
+      this.positionAutocompleteDropdown(textarea, cursorPos);
     },
 
     hideAutocomplete() {
@@ -325,22 +327,66 @@ function latexEditor() {
       this.autocomplete.selectedIndex = -1;
     },
 
-    positionAutocompleteDropdown(textarea, triggerPos) {
+    positionAutocompleteDropdown(textarea, cursorPos) {
       // Get textarea position and dimensions
       const rect = textarea.getBoundingClientRect();
       const style = window.getComputedStyle(textarea);
-      const lineHeight = parseInt(style.lineHeight) || 20;
       
-      // Calculate approximate cursor position
-      const textBeforeCursor = textarea.value.substring(0, triggerPos);
+      // Create a temporary element to measure text dimensions exactly
+      const measurer = document.createElement('div');
+      measurer.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: ${style.fontFamily};
+        font-size: ${style.fontSize};
+        font-weight: ${style.fontWeight};
+        line-height: ${style.lineHeight};
+        letter-spacing: ${style.letterSpacing};
+        padding: ${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft};
+        border: ${style.borderWidth} ${style.borderStyle} transparent;
+        width: ${textarea.offsetWidth}px;
+        height: auto;
+        overflow: hidden;
+      `;
+      
+      // Add text up to cursor position
+      const textBeforeCursor = textarea.value.substring(0, cursorPos);
+      measurer.textContent = textBeforeCursor;
+      
+      // Add measurer to DOM temporarily
+      document.body.appendChild(measurer);
+      
+      // Get the exact position
+      const measuredHeight = measurer.offsetHeight;
       const lines = textBeforeCursor.split('\n');
-      const currentLine = lines.length - 1;
-      const currentCol = lines[lines.length - 1].length;
+      const lastLine = lines[lines.length - 1];
       
-      // Estimate position (this is approximate due to font metrics)
-      const charWidth = 8; // Approximate character width for monospace font
-      const top = rect.top + (currentLine * lineHeight) + 30 + window.scrollY;
-      const left = rect.left + (currentCol * charWidth) + 10;
+      // Create another measurer for the last line to get width
+      const lineMeasurer = document.createElement('span');
+      lineMeasurer.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        white-space: nowrap;
+        font-family: ${style.fontFamily};
+        font-size: ${style.fontSize};
+        font-weight: ${style.fontWeight};
+        letter-spacing: ${style.letterSpacing};
+      `;
+      lineMeasurer.textContent = lastLine;
+      document.body.appendChild(lineMeasurer);
+      
+      const lineWidth = lineMeasurer.offsetWidth;
+      
+      // Clean up
+      document.body.removeChild(measurer);
+      document.body.removeChild(lineMeasurer);
+      
+      // Calculate final position - position dropdown right at the cursor
+      const lineHeight = parseInt(style.lineHeight) || 20;
+      const top = rect.top + measuredHeight + lineHeight + window.scrollY;
+      const left = rect.left + lineWidth + parseInt(style.paddingLeft || '0', 10);
       
       this.autocomplete.dropdownPosition = { top, left };
     },

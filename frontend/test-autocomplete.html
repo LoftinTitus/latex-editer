@@ -44,8 +44,8 @@
                     <template x-for="(suggestion, index) in autocomplete.suggestions" :key="index">
                         <div 
                             @click="selectAutocompleteSuggestion(index)"
-                            :class="index === autocomplete.selectedIndex ? 'bg-blue-100' : 'hover:bg-gray-100'"
-                            class="px-3 py-2 cursor-pointer font-mono text-sm border-b border-gray-100 last:border-b-0"
+                            :class="index === autocomplete.selectedIndex ? 'selected' : ''"
+                            class="px-3 py-2 cursor-pointer font-mono text-sm border-b border-gray-100 last:border-b-0 hover:bg-gray-100"
                             x-text="suggestion"
                         ></div>
                     </template>
@@ -98,7 +98,10 @@
                     const cursorPos = textarea.selectionStart;
                     const text = textarea.value;
                     
-                    this.checkAutocomplete(text, cursorPos, textarea);
+                    // Use requestAnimationFrame for smoother updates
+                    requestAnimationFrame(() => {
+                        this.checkAutocomplete(text, cursorPos, textarea);
+                    });
                 },
 
                 checkAutocomplete(text, cursorPos, textarea) {
@@ -117,7 +120,7 @@
                         const searchTerm = text.substring(backslashPos, cursorPos);
                         
                         if (searchTerm.length >= 1) {
-                            this.showAutocomplete(searchTerm, backslashPos, textarea);
+                            this.showAutocomplete(searchTerm, backslashPos, cursorPos, textarea);
                         } else {
                             this.hideAutocomplete();
                         }
@@ -126,7 +129,7 @@
                     }
                 },
 
-                showAutocomplete(searchTerm, triggerPos, textarea) {
+                showAutocomplete(searchTerm, triggerPos, cursorPos, textarea) {
                     const filtered = LATEX_COMMANDS.filter(cmd => 
                         cmd.toLowerCase().includes(searchTerm.toLowerCase())
                     );
@@ -142,7 +145,7 @@
                     this.autocomplete.selectedIndex = -1;
                     this.autocomplete.showing = true;
 
-                    this.positionAutocompleteDropdown(textarea, triggerPos);
+                    this.positionAutocompleteDropdown(textarea, cursorPos);
                 },
 
                 hideAutocomplete() {
@@ -151,19 +154,65 @@
                     this.autocomplete.selectedIndex = -1;
                 },
 
-                positionAutocompleteDropdown(textarea, triggerPos) {
+                positionAutocompleteDropdown(textarea, cursorPos) {
                     const rect = textarea.getBoundingClientRect();
                     const style = window.getComputedStyle(textarea);
-                    const lineHeight = parseInt(style.lineHeight) || 20;
                     
-                    const textBeforeCursor = textarea.value.substring(0, triggerPos);
+                    // Create a temporary element to measure text dimensions
+                    const measurer = document.createElement('div');
+                    measurer.style.cssText = `
+                        position: absolute;
+                        visibility: hidden;
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                        font-family: ${style.fontFamily};
+                        font-size: ${style.fontSize};
+                        font-weight: ${style.fontWeight};
+                        line-height: ${style.lineHeight};
+                        letter-spacing: ${style.letterSpacing};
+                        padding: ${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft};
+                        border: ${style.borderWidth} ${style.borderStyle} transparent;
+                        width: ${textarea.offsetWidth}px;
+                        height: auto;
+                        overflow: hidden;
+                    `;
+                    
+                    // Add text up to current cursor position
+                    const textBeforeCursor = textarea.value.substring(0, cursorPos);
+                    measurer.textContent = textBeforeCursor;
+                    
+                    // Add measurer to DOM temporarily
+                    document.body.appendChild(measurer);
+                    
+                    // Get the exact position
+                    const measuredHeight = measurer.offsetHeight;
                     const lines = textBeforeCursor.split('\n');
-                    const currentLine = lines.length - 1;
-                    const currentCol = lines[lines.length - 1].length;
+                    const lastLine = lines[lines.length - 1];
                     
-                    const charWidth = 8;
-                    const top = rect.top + (currentLine * lineHeight) + 30 + window.scrollY;
-                    const left = rect.left + (currentCol * charWidth) + 10;
+                    // Create another measurer for the last line to get width
+                    const lineMeasurer = document.createElement('span');
+                    lineMeasurer.style.cssText = `
+                        position: absolute;
+                        visibility: hidden;
+                        white-space: nowrap;
+                        font-family: ${style.fontFamily};
+                        font-size: ${style.fontSize};
+                        font-weight: ${style.fontWeight};
+                        letter-spacing: ${style.letterSpacing};
+                    `;
+                    lineMeasurer.textContent = lastLine;
+                    document.body.appendChild(lineMeasurer);
+                    
+                    const lineWidth = lineMeasurer.offsetWidth;
+                    
+                    // Clean up
+                    document.body.removeChild(measurer);
+                    document.body.removeChild(lineMeasurer);
+                    
+                    // Calculate final position - position dropdown right at the cursor
+                    const lineHeight = parseInt(style.lineHeight) || 20;
+                    const top = rect.top + measuredHeight + lineHeight + window.scrollY;
+                    const left = rect.left + lineWidth + parseInt(style.paddingLeft || '0', 10);
                     
                     this.autocomplete.dropdownPosition = { top, left };
                 },
