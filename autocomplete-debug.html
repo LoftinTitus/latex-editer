@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocomplete Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        .autocomplete-dropdown {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: 250px;
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border-bottom: 1px solid #eee;
+        }
+        .autocomplete-item:hover {
+            background: #f0f0f0;
+        }
+        .autocomplete-item.selected {
+            background: #007acc;
+            color: white;
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LaTeX Autocomplete Debug Test</h1>
+        <p>Type <code>\</code> followed by letters to test autocomplete (e.g., <code>\sec</code>, <code>\frac</code>, <code>\begin</code>)</p>
+        
+        <div style="position: relative;">
+            <textarea id="editor" placeholder="Type \ to test autocomplete..."></textarea>
+            <div id="autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+        </div>
+        
+        <div class="debug-info" id="debug">
+            Ready to test...
+        </div>
+    </div>
+
+    <script>
+        // LaTeX commands for autocomplete
+        const LATEX_COMMANDS = [
+            '\\documentclass{article}', '\\begin{document}', '\\end{document}',
+            '\\section{}', '\\subsection{}', '\\subsubsection{}',
+            '\\textbf{}', '\\textit{}', '\\emph{}',
+            '\\frac{}{}', '\\sqrt{}', '\\sum', '\\int',
+            '\\begin{equation}', '\\end{equation}',
+            '\\begin{align}', '\\end{align}',
+            '\\begin{itemize}', '\\end{itemize}',
+            '\\item', '\\label{}', '\\ref{}',
+            '\\alpha', '\\beta', '\\gamma', '\\delta'
+        ];
+
+        class AutocompleteDebugger {
+            constructor() {
+                this.textarea = document.getElementById('editor');
+                this.dropdown = document.getElementById('autocomplete');
+                this.debug = document.getElementById('debug');
+                this.suggestions = [];
+                this.selectedIndex = -1;
+                this.triggerPos = -1;
+                this.searchTerm = '';
+                this.showing = false;
+
+                this.init();
+            }
+
+            init() {
+                this.textarea.addEventListener('input', (e) => this.onInput(e));
+                this.textarea.addEventListener('keydown', (e) => this.onKeyDown(e));
+                document.addEventListener('click', (e) => this.onDocumentClick(e));
+            }
+
+            onInput(event) {
+                const textarea = event.target;
+                const cursorPos = textarea.selectionStart;
+                const text = textarea.value;
+                
+                this.updateDebug(`Input event - Cursor: ${cursorPos}, Text length: ${text.length}`);
+                this.checkAutocomplete(text, cursorPos, textarea);
+            }
+
+            checkAutocomplete(text, cursorPos, textarea) {
+                // Look backwards from cursor to find backslash
+                let backslashPos = -1;
+                for (let i = cursorPos - 1; i >= 0; i--) {
+                    if (text[i] === '\\') {
+                        backslashPos = i;
+                        break;
+                    }
+                    // If we hit whitespace or another command, stop
+                    if (/\s/.test(text[i]) || text[i] === '}' || text[i] === '{' || text[i] === '$') {
+                        break;
+                    }
+                }
+
+                if (backslashPos !== -1) {
+                    const searchTerm = text.substring(backslashPos, cursorPos);
+                    this.updateDebug(`Found backslash at ${backslashPos}, search term: "${searchTerm}"`);
+                    
+                    // Only show autocomplete if we have at least backslash + one character
+                    if (searchTerm.length >= 2) {
+                        this.showAutocomplete(searchTerm, backslashPos, cursorPos, textarea);
+                    } else if (searchTerm.length === 1 && searchTerm === '\\') {
+                        // Show all commands when just backslash is typed
+                        this.showAutocomplete('\\', backslashPos, cursorPos, textarea);
+                    } else {
+                        this.hideAutocomplete();
+                    }
+                } else {
+                    this.updateDebug(`No backslash found before cursor`);
+                    this.hideAutocomplete();
+                }
+            }
+
+            showAutocomplete(searchTerm, triggerPos, cursorPos, textarea) {
+                // Filter commands based on search term
+                const filtered = LATEX_COMMANDS.filter(cmd => 
+                    cmd.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+                this.updateDebug(`Filtering commands for "${searchTerm}" - Found ${filtered.length} matches`);
+
+                if (filtered.length === 0) {
+                    this.hideAutocomplete();
+                    return;
+                }
+
+                this.suggestions = filtered.slice(0, 10);
+                this.triggerPos = triggerPos;
+                this.searchTerm = searchTerm;
+                this.selectedIndex = -1;
+                this.showing = true;
+
+                this.positionDropdown(textarea, cursorPos);
+                this.renderDropdown();
+            }
+
+            hideAutocomplete() {
+                this.showing = false;
+                this.dropdown.style.display = 'none';
+                this.suggestions = [];
+                this.selectedIndex = -1;
+                this.updateDebug('Autocomplete hidden');
+            }
+
+            positionDropdown(textarea, cursorPos) {
+                const rect = textarea.getBoundingClientRect();
+                const style = window.getComputedStyle(textarea);
+                
+                // Simple positioning - just below the textarea for now
+                const top = rect.bottom + window.scrollY + 5;
+                const left = rect.left + window.scrollX;
+                
+                this.dropdown.style.top = top + 'px';
+                this.dropdown.style.left = left + 'px';
+                this.dropdown.style.display = 'block';
+            }
+
+            renderDropdown() {
+                this.dropdown.innerHTML = '';
+                this.suggestions.forEach((suggestion, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    if (index === this.selectedIndex) {
+                        item.classList.add('selected');
+                    }
+                    item.textContent = suggestion;
+                    item.onclick = () => this.selectSuggestion(index);
+                    this.dropdown.appendChild(item);
+                });
+            }
+
+            selectSuggestion(index) {
+                if (index >= 0 && index < this.suggestions.length) {
+                    this.selectedIndex = index;
+                    this.applySuggestion(this.suggestions[index]);
+                }
+            }
+
+            applySuggestion(suggestion) {
+                const textarea = this.textarea;
+                const cursorPos = textarea.selectionStart;
+                const text = textarea.value;
+                
+                // Replace the search term with the suggestion
+                const beforeTrigger = text.substring(0, this.triggerPos);
+                const afterCursor = text.substring(cursorPos);
+                
+                // For commands with braces, position cursor inside the braces
+                let newCursorPos;
+                if (suggestion.includes('{}')) {
+                    const braceIndex = suggestion.indexOf('{}');
+                    newCursorPos = this.triggerPos + braceIndex + 1;
+                    textarea.value = beforeTrigger + suggestion + afterCursor;
+                } else {
+                    newCursorPos = this.triggerPos + suggestion.length;
+                    textarea.value = beforeTrigger + suggestion + afterCursor;
+                }
+                
+                this.hideAutocomplete();
+                
+                // Set cursor position after the update
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.setSelectionRange(newCursorPos, newCursorPos);
+                }, 0);
+
+                this.updateDebug(`Applied suggestion: "${suggestion}"`);
+            }
+
+            onKeyDown(event) {
+                if (!this.showing) return;
+
+                switch (event.key) {
+                    case 'ArrowDown':
+                        event.preventDefault();
+                        this.selectedIndex = Math.min(this.selectedIndex + 1, this.suggestions.length - 1);
+                        this.renderDropdown();
+                        break;
+                    case 'ArrowUp':
+                        event.preventDefault();
+                        this.selectedIndex = Math.max(this.selectedIndex - 1, -1);
+                        this.renderDropdown();
+                        break;
+                    case 'Enter':
+                    case 'Tab':
+                        event.preventDefault();
+                        if (this.selectedIndex >= 0) {
+                            this.selectSuggestion(this.selectedIndex);
+                        } else if (this.suggestions.length > 0) {
+                            this.selectSuggestion(0);
+                        }
+                        break;
+                    case 'Escape':
+                        event.preventDefault();
+                        this.hideAutocomplete();
+                        break;
+                }
+            }
+
+            onDocumentClick(event) {
+                if (!this.dropdown.contains(event.target) && event.target !== this.textarea) {
+                    this.hideAutocomplete();
+                }
+            }
+
+            updateDebug(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.debug.innerHTML = `[${timestamp}] ${message}`;
+                console.log(`[Autocomplete Debug] ${message}`);
+            }
+        }
+
+        // Initialize the debugger when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new AutocompleteDebugger();
+        });
+    </script>
+</body>
+</html>

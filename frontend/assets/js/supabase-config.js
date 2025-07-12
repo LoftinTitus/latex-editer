@@ -2,14 +2,26 @@
 const SUPABASE_URL = 'YOUR_SUPABASE_URL';
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
-// Initialize Supabase client
-const { createClient } = supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Initialize Supabase client with error handling
+let supabaseClient = null;
+try {
+  const { createClient } = supabase;
+  if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else {
+    console.warn('Supabase configuration not set. Authentication features will be disabled.');
+  }
+} catch (error) {
+  console.error('Failed to initialize Supabase client:', error);
+}
 
 // Auth helper functions for frontend
 const authHelpers = {
   // Sign up with email and password
   signUp: async (email, password, metadata = {}) => {
+    if (!supabaseClient) {
+      throw new Error('Supabase not configured. Authentication unavailable.');
+    }
     try {
       const { data, error } = await supabaseClient.auth.signUp({
         email,
@@ -29,6 +41,9 @@ const authHelpers = {
 
   // Sign in with email and password
   signIn: async (email, password) => {
+    if (!supabaseClient) {
+      throw new Error('Supabase not configured. Authentication unavailable.');
+    }
     try {
       const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
@@ -69,6 +84,9 @@ const authHelpers = {
 
   // Get current session
   getCurrentSession: async () => {
+    if (!supabaseClient) {
+      return null;
+    }
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (error) throw error;
@@ -81,6 +99,10 @@ const authHelpers = {
 
   // Listen to auth state changes
   onAuthStateChange: (callback) => {
+    if (!supabaseClient) {
+      // Return a no-op function when Supabase isn't configured
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    }
     return supabaseClient.auth.onAuthStateChange(callback);
   },
 
@@ -100,9 +122,6 @@ const authHelpers = {
   }
 };
 
-// API configuration
-const API_BASE_URL = 'http://localhost:8000';
-
 // Helper function to get auth headers
 const getAuthHeaders = async () => {
   const session = await authHelpers.getCurrentSession();
@@ -121,7 +140,7 @@ const dbHelpers = {
   saveNote: async (title, content, latexContent = null) => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/notes`, {
+      const response = await fetch(`${window.API_BASE_URL}/notes`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -152,7 +171,7 @@ const dbHelpers = {
       if (content !== undefined) updateData.content = content;
       if (latexContent !== undefined) updateData.latex_content = latexContent;
       
-      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+      const response = await fetch(`${window.API_BASE_URL}/notes/${noteId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updateData)
@@ -174,7 +193,7 @@ const dbHelpers = {
   getUserNotes: async () => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/notes`, {
+      const response = await fetch(`${window.API_BASE_URL}/notes`, {
         method: 'GET',
         headers
       });
@@ -196,7 +215,7 @@ const dbHelpers = {
   getNote: async (noteId) => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+      const response = await fetch(`${window.API_BASE_URL}/notes/${noteId}`, {
         method: 'GET',
         headers
       });
@@ -217,7 +236,7 @@ const dbHelpers = {
   deleteNote: async (noteId) => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+      const response = await fetch(`${window.API_BASE_URL}/notes/${noteId}`, {
         method: 'DELETE',
         headers
       });

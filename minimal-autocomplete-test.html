@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Autocomplete Test</title>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        .autocomplete-dropdown {
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: 250px;
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border-bottom: 1px solid #eee;
+        }
+        .autocomplete-item:hover {
+            background: #f0f0f0;
+        }
+        .autocomplete-item.selected {
+            background: #007acc;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>LaTeX Autocomplete Test</h1>
+    <p>Type <code>\</code> to test autocomplete (e.g., <code>\sec</code>, <code>\frac</code>, <code>\begin</code>)</p>
+    
+    <div x-data="minimalEditor()" x-init="init()">
+        <div style="position: relative;">
+            <textarea 
+                x-ref="textarea"
+                x-model="content"
+                placeholder="Type \ to test autocomplete..."
+                @input="onInput($event)"
+            ></textarea>
+            
+            <div 
+                x-show="autocomplete.showing" 
+                class="autocomplete-dropdown"
+                :style="`top: ${autocomplete.position.top}px; left: ${autocomplete.position.left}px;`"
+            >
+                <template x-for="(suggestion, index) in autocomplete.suggestions" :key="index">
+                    <div 
+                        @click="selectSuggestion(index)"
+                        :class="index === autocomplete.selectedIndex ? 'autocomplete-item selected' : 'autocomplete-item'"
+                        x-text="suggestion"
+                    ></div>
+                </template>
+            </div>
+        </div>
+        
+        <div style="margin-top: 10px; font-family: monospace; font-size: 12px; color: #666;">
+            Status: <span x-text="status"></span>
+        </div>
+    </div>
+
+    <script>
+        function minimalEditor() {
+            return {
+                content: '',
+                status: 'Ready',
+                autocomplete: {
+                    showing: false,
+                    suggestions: [],
+                    selectedIndex: -1,
+                    triggerPos: -1,
+                    searchTerm: '',
+                    position: { top: 0, left: 0 }
+                },
+                
+                commands: [
+                    '\\documentclass{article}', '\\begin{document}', '\\end{document}',
+                    '\\section{}', '\\subsection{}', '\\subsubsection{}',
+                    '\\textbf{}', '\\textit{}', '\\emph{}',
+                    '\\frac{}{}', '\\sqrt{}', '\\sum', '\\int',
+                    '\\begin{equation}', '\\end{equation}',
+                    '\\begin{align}', '\\end{align}',
+                    '\\begin{itemize}', '\\end{itemize}',
+                    '\\item', '\\label{}', '\\ref{}',
+                    '\\alpha', '\\beta', '\\gamma', '\\delta'
+                ],
+
+                init() {
+                    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                    this.status = 'Initialized - Type \\ to test';
+                },
+
+                onInput(event) {
+                    const textarea = event.target;
+                    const cursorPos = textarea.selectionStart;
+                    const text = textarea.value;
+                    
+                    this.status = `Cursor at ${cursorPos}, checking autocomplete...`;
+                    this.checkAutocomplete(text, cursorPos, textarea);
+                },
+
+                checkAutocomplete(text, cursorPos, textarea) {
+                    // Look backwards from cursor to find backslash
+                    let backslashPos = -1;
+                    for (let i = cursorPos - 1; i >= 0; i--) {
+                        if (text[i] === '\\') {
+                            backslashPos = i;
+                            break;
+                        }
+                        if (/\s/.test(text[i]) || text[i] === '}' || text[i] === '{' || text[i] === '$') {
+                            break;
+                        }
+                    }
+
+                    if (backslashPos !== -1) {
+                        const searchTerm = text.substring(backslashPos, cursorPos);
+                        this.status = `Found search term: "${searchTerm}"`;
+                        
+                        if (searchTerm.length >= 1) {
+                            this.showAutocomplete(searchTerm, backslashPos, cursorPos, textarea);
+                        } else {
+                            this.hideAutocomplete();
+                        }
+                    } else {
+                        this.status = 'No backslash found';
+                        this.hideAutocomplete();
+                    }
+                },
+
+                showAutocomplete(searchTerm, triggerPos, cursorPos, textarea) {
+                    const filtered = this.commands.filter(cmd => 
+                        cmd.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+
+                    if (filtered.length === 0) {
+                        this.hideAutocomplete();
+                        this.status = `No matches for "${searchTerm}"`;
+                        return;
+                    }
+
+                    this.autocomplete.suggestions = filtered.slice(0, 10);
+                    this.autocomplete.triggerPos = triggerPos;
+                    this.autocomplete.searchTerm = searchTerm;
+                    this.autocomplete.selectedIndex = -1;
+                    this.autocomplete.showing = true;
+                    
+                    this.positionDropdown(textarea, cursorPos);
+                    this.status = `Showing ${filtered.length} suggestions for "${searchTerm}"`;
+                },
+
+                hideAutocomplete() {
+                    this.autocomplete.showing = false;
+                    this.autocomplete.suggestions = [];
+                    this.autocomplete.selectedIndex = -1;
+                },
+
+                positionDropdown(textarea, cursorPos) {
+                    const rect = textarea.getBoundingClientRect();
+                    const top = rect.bottom + window.scrollY + 5;
+                    const left = rect.left + window.scrollX;
+                    
+                    this.autocomplete.position = { top, left };
+                },
+
+                selectSuggestion(index) {
+                    if (index >= 0 && index < this.autocomplete.suggestions.length) {
+                        this.applySuggestion(this.autocomplete.suggestions[index]);
+                    }
+                },
+
+                applySuggestion(suggestion) {
+                    const textarea = this.$refs.textarea;
+                    const cursorPos = textarea.selectionStart;
+                    const text = textarea.value;
+                    
+                    const beforeTrigger = text.substring(0, this.autocomplete.triggerPos);
+                    const afterCursor = text.substring(cursorPos);
+                    
+                    let newCursorPos;
+                    if (suggestion.includes('{}')) {
+                        const braceIndex = suggestion.indexOf('{}');
+                        newCursorPos = this.autocomplete.triggerPos + braceIndex + 1;
+                        this.content = beforeTrigger + suggestion + afterCursor;
+                    } else {
+                        newCursorPos = this.autocomplete.triggerPos + suggestion.length;
+                        this.content = beforeTrigger + suggestion + afterCursor;
+                    }
+                    
+                    this.hideAutocomplete();
+                    this.status = `Applied: "${suggestion}"`;
+                    
+                    setTimeout(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(newCursorPos, newCursorPos);
+                    }, 0);
+                },
+
+                handleKeyDown(event) {
+                    if (!this.autocomplete.showing) return;
+
+                    switch (event.key) {
+                        case 'ArrowDown':
+                            event.preventDefault();
+                            this.autocomplete.selectedIndex = Math.min(
+                                this.autocomplete.selectedIndex + 1,
+                                this.autocomplete.suggestions.length - 1
+                            );
+                            break;
+                        case 'ArrowUp':
+                            event.preventDefault();
+                            this.autocomplete.selectedIndex = Math.max(
+                                this.autocomplete.selectedIndex - 1,
+                                -1
+                            );
+                            break;
+                        case 'Enter':
+                        case 'Tab':
+                            event.preventDefault();
+                            if (this.autocomplete.selectedIndex >= 0) {
+                                this.selectSuggestion(this.autocomplete.selectedIndex);
+                            } else if (this.autocomplete.suggestions.length > 0) {
+                                this.selectSuggestion(0);
+                            }
+                            break;
+                        case 'Escape':
+                            event.preventDefault();
+                            this.hideAutocomplete();
+                            break;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>

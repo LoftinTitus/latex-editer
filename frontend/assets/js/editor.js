@@ -1,5 +1,37 @@
-// API configuration
-const API_BASE_URL = 'http://localhost:8000';
+// API configuration - Define globally
+window.API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000' 
+  : 'https://latex-editor-backend.fly.dev';
+
+// Utility functions
+const utils = {
+  // Debounce function to limit how often a function is called
+  debounce: (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  },
+
+  // Format date for display
+  formatDate: (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      return dateString;
+    }
+  }
+};
 
 // LaTeX commands for autocomplete
 const LATEX_COMMANDS = [
@@ -500,7 +532,7 @@ function latexEditor() {
         }
 
         // Call the backend compile/pdf endpoint
-        const response = await fetch(`${API_BASE_URL}/compile/pdf`, {
+        const response = await fetch(`${window.API_BASE_URL}/compile/pdf`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
