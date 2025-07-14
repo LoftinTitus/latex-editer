@@ -83,6 +83,15 @@
             <div id="autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
         </div>
         
+        <div style="margin-top: 10px;">
+            <button id="compileBtn" style="background: #007acc; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                Compile LaTeX
+            </button>
+            <button id="clearBtn" style="background: #666; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;">
+                Clear
+            </button>
+        </div>
+        
         <div class="debug-info" id="debug">
             Ready to test...
         </div>
@@ -323,7 +332,32 @@
 
         // Initialize the debugger when page loads
         document.addEventListener('DOMContentLoaded', () => {
-            new AutocompleteDebugger();
+            const debugger = new AutocompleteDebugger();
+            
+            // Add compile button functionality
+            const compileBtn = document.getElementById('compileBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const textarea = document.getElementById('editor');
+            
+            compileBtn.addEventListener('click', () => {
+                const content = textarea.value.trim();
+                if (!content) {
+                    debugger.updateDebug('No content to compile');
+                    return;
+                }
+                
+                debugger.updateDebug(`Compiling LaTeX content (${content.length} characters)...`);
+                
+                // Simulate compilation (since this is a debug file)
+                setTimeout(() => {
+                    debugger.updateDebug('Compilation complete! (This is a simulation - use the main editor for actual compilation)');
+                }, 1000);
+            });
+            
+            clearBtn.addEventListener('click', () => {
+                textarea.value = '';
+                debugger.updateDebug('Editor cleared');
+            });
         });
     </script>
 </body>

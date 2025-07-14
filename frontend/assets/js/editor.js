@@ -249,6 +249,8 @@ function latexEditor() {
 
     // Initialize the component
     async init() {
+      console.log('Alpine.js component initializing...');
+      
       // Check for existing session
       await this.checkAuth();
       
@@ -511,6 +513,8 @@ function latexEditor() {
 
     // Compile LaTeX to PDF
     async compile() {
+      console.log('Compile function called!');
+      
       if (!this.latexContent.trim()) {
         this.showStatus('Please enter some LaTeX content first.', 'error');
         return;
@@ -581,6 +585,8 @@ function latexEditor() {
 
     // Clear the editor / Create new note
     clearEditor() {
+      console.log('Clear editor function called!');
+      
       if (this.latexContent.trim() && !confirm('Are you sure you want to clear the editor and start a new note?')) {
         return;
       }
