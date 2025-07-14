@@ -27,7 +27,7 @@ function authPage() {
       const session = await authHelpers.getCurrentSession();
       if (session) {
         // Redirect to main editor if already logged in
-        window.location.href = './index.html';
+        window.location.href = './frontend/index.html';
       }
 
       // Listen for auth state changes
@@ -35,7 +35,7 @@ function authPage() {
         if (event === 'SIGNED_IN') {
           this.showStatus('Login successful! Redirecting...', 'success');
           setTimeout(() => {
-            window.location.href = './index.html';
+            window.location.href = './frontend/index.html';
           }, 1500);
         }
       });
@@ -81,7 +81,7 @@ function authPage() {
           
           // Redirect after short delay
           setTimeout(() => {
-            window.location.href = './index.html';
+            window.location.href = './frontend/index.html';
           }, 1500);
         }
       } catch (error) {
@@ -133,7 +133,7 @@ function authPage() {
             // User is immediately confirmed (might happen in development)
             this.showStatus('Account created successfully! Redirecting...', 'success');
             setTimeout(() => {
-              window.location.href = './index.html';
+              window.location.href = './frontend/index.html';
             }, 1500);
           } else {
             // User needs to confirm email
