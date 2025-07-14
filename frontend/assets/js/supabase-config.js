@@ -272,7 +272,7 @@ const dbHelpers = {
 };
 
 // Utility functions
-const utils = {
+const supabaseUtils = {
   // Debounce function for auto-save
   debounce: (func, wait) => {
     let timeout;
