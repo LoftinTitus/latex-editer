@@ -45,13 +45,23 @@
             font-family: 'Courier New', monospace;
             font-size: 13px;
             border-bottom: 1px solid #eee;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
         .autocomplete-item:hover {
             background: #f0f0f0;
         }
+        .autocomplete-item:active {
+            background: #e0e0e0;
+        }
         .autocomplete-item.selected {
             background: #007acc;
             color: white;
+        }
+        .autocomplete-item.selected:hover {
+            background: #005a9e;
         }
         .debug-info {
             margin-top: 20px;
@@ -207,15 +217,31 @@
                         item.classList.add('selected');
                     }
                     item.textContent = suggestion;
-                    item.onclick = () => this.selectSuggestion(index);
+                    
+                    // Use addEventListener instead of onclick for better event handling
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.selectSuggestion(index);
+                    });
+                    
+                    // Also add mousedown event as backup
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        this.selectSuggestion(index);
+                    });
+                    
                     this.dropdown.appendChild(item);
                 });
             }
 
             selectSuggestion(index) {
+                this.updateDebug(`Selecting suggestion at index ${index}`);
                 if (index >= 0 && index < this.suggestions.length) {
                     this.selectedIndex = index;
                     this.applySuggestion(this.suggestions[index]);
+                } else {
+                    this.updateDebug(`Invalid index: ${index}, suggestions length: ${this.suggestions.length}`);
                 }
             }
 
@@ -281,9 +307,11 @@
             }
 
             onDocumentClick(event) {
-                if (!this.dropdown.contains(event.target) && event.target !== this.textarea) {
-                    this.hideAutocomplete();
+                // Don't hide if clicking on the dropdown or textarea
+                if (this.dropdown.contains(event.target) || event.target === this.textarea) {
+                    return;
                 }
+                this.hideAutocomplete();
             }
 
             updateDebug(message) {
